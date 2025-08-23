@@ -88,6 +88,29 @@ See `.env.example` for a template. For Supabase Edge Functions, set secrets (in 
 
 Tip: keep old read-only credentials around temporarily to verify data parity.
 
+### Optional helpers (scripts/migrate)
+
+- Copy database tables: edit `scripts/migrate/tables.example.json` → save as `tables.json` and list the tables you want to copy.
+- Then run (PowerShell):
+
+```
+$env:OLD_SUPABASE_URL="https://OLD.supabase.co"
+$env:OLD_SUPABASE_SERVICE_ROLE_KEY="<old-service-role>"
+$env:NEW_SUPABASE_URL="https://NEW.supabase.co"
+$env:NEW_SUPABASE_SERVICE_ROLE_KEY="<new-service-role>"
+node scripts/migrate/db-copy.mjs
+```
+
+- Copy Storage buckets/objects:
+
+```
+$env:OLD_SUPABASE_URL="https://OLD.supabase.co"
+$env:OLD_SUPABASE_SERVICE_ROLE_KEY="<old-service-role>"
+$env:NEW_SUPABASE_URL="https://NEW.supabase.co"
+$env:NEW_SUPABASE_SERVICE_ROLE_KEY="<new-service-role>"
+node scripts/migrate/storage-migrate.mjs
+```
+
 ## How can I deploy this project?
 
 Use Cloudflare Pages:

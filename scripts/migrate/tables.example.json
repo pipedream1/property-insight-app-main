@@ -1,0 +1,8 @@
+{
+  "tables": [
+    { "name": "property_components" },
+    { "name": "maintenance_tasks" },
+    { "name": "water_readings" },
+    { "name": "reports" }
+  ]
+}
