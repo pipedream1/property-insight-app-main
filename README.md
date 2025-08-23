@@ -60,9 +60,42 @@ This project is built with:
 - shadcn-ui
 - Tailwind CSS
 
+## Environment configuration (Supabase)
+
+This app now reads Supabase credentials from environment variables to make switching projects seamless.
+
+Set these variables in your environment (local `.env`, Cloudflare Pages, or CI):
+
+```
+VITE_SUPABASE_URL=
+VITE_SUPABASE_ANON_KEY=
+```
+
+See `.env.example` for a template. For Supabase Edge Functions, set secrets (in the Supabase dashboard) like:
+
+- `OPENAI_API_KEY`
+- `OPENAI_MODEL` (e.g. `gpt-5-mini`)
+
+### Migrating to a new Supabase project
+
+1. Backup current data: in the old Supabase project, use Table Editor export or `supabase db dump`.
+2. Create the new project, then import schema and data:
+	- Run SQL from `supabase/migrations` to recreate schema.
+	- Import CSVs or use `supabase db reset && supabase db push` depending on your workflow.
+3. Deploy Edge Functions in the new project and set function secrets.
+4. Update environment variables (above) for each environment (local, preview, production).
+5. Smoke test: app login, water readings list, reports, AI insights.
+
+Tip: keep old read-only credentials around temporarily to verify data parity.
+
 ## How can I deploy this project?
 
-Simply open [Lovable](https://lovable.dev/projects/2b44bfe9-1a79-4706-a3b8-518e0074f890) and click on Share -> Publish.
+Use Cloudflare Pages:
+
+- Framework preset: Vite
+- Build command: `npm ci && npm run build`
+- Output directory: `dist`
+- Environment variables: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
 
 ## Can I connect a custom domain to my Lovable project?
 
