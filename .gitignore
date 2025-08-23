@@ -22,3 +22,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Environment and local configs
+.env
+.env.*
+
+# Ignore nested repo folder if present
+property-insight-app-main/
