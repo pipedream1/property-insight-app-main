@@ -64,9 +64,10 @@ dist-ssr
 *.sln
 *.sw?
 
-# Environment and local configs
+# Environment and local configs (deduped)
 .env
 .env.*
+!.env.example
 
 # Ignore nested repo folder if present
 property-insight-app-main/
