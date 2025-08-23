@@ -1,0 +1,5 @@
+
+project_id = "ytqenpdwynascsmfolbj"
+
+[functions.resident-chatbot]
+verify_jwt = false
