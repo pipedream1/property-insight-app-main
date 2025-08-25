@@ -42,6 +42,45 @@ if (!Array.isArray(tables) || tables.length === 0) {
 const oldCli = createClient(process.env.OLD_SUPABASE_URL, process.env.OLD_SUPABASE_SERVICE_ROLE_KEY)
 const newCli = createClient(process.env.NEW_SUPABASE_URL, process.env.NEW_SUPABASE_SERVICE_ROLE_KEY)
 
+function normalizeDate(value, fallback) {
+  if (!value) return null
+  const str = String(value)
+  // Already YYYY-MM-DD
+  const ymd = str.match(/^\d{4}-\d{2}-\d{2}$/)
+  if (ymd) return str
+  // Timestamp -> take date part in UTC
+  try {
+    const d = new Date(str)
+    if (!isNaN(d.getTime())) {
+      return d.toISOString().slice(0, 10)
+    }
+  } catch {}
+  // Time-only or anything else -> use fallback date if available
+  if (fallback) return fallback
+  return null
+}
+
+function transformRow(tableName, row) {
+  const out = { ...row }
+  if (tableName === 'property_components') {
+    const fallback = row.created_at ? normalizeDate(row.created_at) : null
+    out.date = normalizeDate(row.date, fallback)
+  }
+  if (tableName === 'water_readings') {
+    const fallback = row.created_at ? normalizeDate(row.created_at) : null
+    out.date = normalizeDate(row.date, fallback)
+  }
+  if (tableName === 'inspections') {
+    const fallback = row.created_at ? normalizeDate(row.created_at) : null
+    out.inspection_date = normalizeDate(row.inspection_date, fallback) || new Date().toISOString().slice(0, 10)
+  }
+  if (tableName === 'reservoir_readings') {
+    const fallback = row.created_at ? normalizeDate(row.created_at) : null
+    out.reading_date = normalizeDate(row.reading_date, fallback) || new Date().toISOString().slice(0, 10)
+  }
+  return out
+}
+
 async function copyTable(tableName, chunkSize = 1000) {
   console.log(`\nMigrating table: ${tableName}`)
 
@@ -53,7 +92,7 @@ async function copyTable(tableName, chunkSize = 1000) {
   let offset = 0
   let copied = 0
   while (true) {
-    const { data, error } = await oldCli
+  const { data, error } = await oldCli
       .from(tableName)
       .select('*')
       .range(offset, offset + chunkSize - 1)
@@ -61,7 +100,8 @@ async function copyTable(tableName, chunkSize = 1000) {
     if (error) throw new Error(`Select failed for ${tableName}: ${error.message}`)
     if (!data || data.length === 0) break
 
-    const { error: upErr } = await newCli.from(tableName).upsert(data, { onConflict: undefined })
+  const transformed = data.map((r) => transformRow(tableName, r))
+  const { error: upErr } = await newCli.from(tableName).upsert(transformed, { onConflict: undefined })
     if (upErr) throw new Error(`Upsert failed for ${tableName}: ${upErr.message}`)
 
     copied += data.length

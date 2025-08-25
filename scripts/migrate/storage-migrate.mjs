@@ -43,21 +43,22 @@ async function ensureBucket(newCli, bucket) {
 }
 
 async function listAllObjects(cli, bucketName) {
+  // Returns array of { path, updated_at, size }
   const results = []
   const queue = [''] // prefixes to traverse
   while (queue.length) {
     const prefix = queue.shift()
-    // list path prefix
     const { data, error } = await cli.storage.from(bucketName).list(prefix, { limit: 1000 })
     if (error) throw error
     for (const item of data || []) {
-      if (item.name === null) continue
-      if (item.id && item.metadata && item.updated_at) {
-        // File
+      if (!item || item.name == null) continue
+      const isFile = !!(item.id || (item.metadata && (item.metadata.size != null || item.metadata.mimetype)))
+      if (isFile) {
         const path = prefix ? `${prefix}/${item.name}` : item.name
-        results.push(path)
+        const updated_at = item.updated_at || (item.metadata && item.metadata.lastModified) || null
+        const size = (item.metadata && item.metadata.size) || null
+        results.push({ path, updated_at: updated_at ? new Date(updated_at) : null, size })
       } else {
-        // Folder
         const nextPrefix = prefix ? `${prefix}/${item.name}` : item.name
         queue.push(nextPrefix)
       }
@@ -74,6 +75,28 @@ async function copyObject(oldCli, newCli, bucketName, path) {
   if (upErr) throw upErr
 }
 
+async function copyObjectWithRetry(oldCli, newCli, bucketName, path, attempts = 3) {
+  let delay = 1000
+  for (let i = 1; i <= attempts; i++) {
+    try {
+      await copyObject(oldCli, newCli, bucketName, path)
+      return
+    } catch (e) {
+      const msg = (e && e.message) ? e.message : String(e)
+      if (i === attempts) {
+        throw new Error(`copy failed after ${attempts} attempts for ${bucketName}/${path}: ${msg}`)
+      }
+      // Backoff and retry on transient network/storage errors
+      const retryable = /ECONNRESET|ETIMEDOUT|fetch failed|network|timeout|429/.test(msg)
+      if (!retryable) {
+        throw e
+      }
+      await new Promise((r) => setTimeout(r, delay))
+      delay = Math.min(delay * 2, 10000)
+    }
+  }
+}
+
 async function main() {
   console.log('Listing buckets from source project...')
   const { data: buckets, error } = await oldClient.storage.listBuckets()
@@ -82,16 +105,64 @@ async function main() {
   for (const bucket of buckets || []) {
     console.log(`\nMigrating bucket: ${bucket.name}`)
     await ensureBucket(newClient, bucket)
-    const files = await listAllObjects(oldClient, bucket.name)
-    console.log(`Found ${files.length} objects`)
+    const srcFiles = await listAllObjects(oldClient, bucket.name)
+    console.log(`Found ${srcFiles.length} objects in source`)
+
+    // Build a set of existing target objects to enable fast skip
+    let existing = []
+    try {
+      existing = await listAllObjects(newClient, bucket.name)
+    } catch (e) {
+      // If listing new bucket fails (empty/new), treat as none existing
+      existing = []
+    }
+    const existingMap = new Map(existing.map((o) => [o.path, o]))
+    if (existing.length) {
+      console.log(`Target already has ${existing.length} objects`)
+    }
     let i = 0
-    for (const f of files) {
+    const failed = []
+    let copied = 0
+    let updated = 0
+    let skipped = 0
+    for (const f of srcFiles) {
       i++
-      process.stdout.write(`  [${i}/${files.length}] ${f}    \r`)
-      await copyObject(oldClient, newClient, bucket.name, f)
+      const tgt = existingMap.get(f.path)
+      if (!tgt) {
+        process.stdout.write(`  [${i}/${srcFiles.length}] ${f.path} (copy)   \r`)
+        try {
+          await copyObjectWithRetry(oldClient, newClient, bucket.name, f.path)
+          copied++
+        } catch (e) {
+          failed.push({ path: f.path, error: (e && e.message) ? e.message : String(e) })
+        }
+      } else {
+        // Compare updated_at if available; if source is newer by >1s, re-upload (upsert)
+        const srcTime = f.updated_at ? f.updated_at.getTime() : null
+        const tgtTime = tgt.updated_at ? tgt.updated_at.getTime() : null
+        if (srcTime != null && tgtTime != null && srcTime > tgtTime + 1000) {
+          process.stdout.write(`  [${i}/${srcFiles.length}] ${f.path} (update)   \r`)
+          try {
+            await copyObjectWithRetry(oldClient, newClient, bucket.name, f.path)
+            updated++
+          } catch (e) {
+            failed.push({ path: f.path, error: (e && e.message) ? e.message : String(e) })
+          }
+        } else {
+          process.stdout.write(`  [${i}/${srcFiles.length}] ${f.path} (skip)   \r`)
+          skipped++
+        }
+      }
     }
     process.stdout.write('\n')
-    console.log(`Bucket ${bucket.name} migration complete.`)
+    console.log(`Bucket ${bucket.name} migration complete. Copied: ${copied}, Updated: ${updated}, Skipped: ${skipped}.`)
+    if (failed.length) {
+      console.log(`\n${failed.length} objects failed to copy. Rerun will retry only these remaining ones.`)
+      // Optionally, print a few samples
+      for (const sample of failed.slice(0, 5)) {
+        console.log(` - ${sample.path}: ${sample.error}`)
+      }
+    }
   }
   console.log('\nStorage migration done!')
 }

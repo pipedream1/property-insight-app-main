@@ -1,0 +1,17 @@
+{
+  "tables": [
+    { "name": "profiles" },
+    { "name": "contacts" },
+    { "name": "property_components" },
+    { "name": "inspections" },
+    { "name": "maintenance_tasks" },
+    { "name": "maintenance_photos" },
+    { "name": "location_tracks" },
+    { "name": "water_readings" },
+    { "name": "reservoir_readings" },
+    { "name": "reports" },
+    { "name": "pdf_chunks" },
+    { "name": "whatsapp_config" },
+    { "name": "whatsapp_messages" }
+  ]
+}
