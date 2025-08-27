@@ -4,6 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import Health from "./pages/Health";
 import { navItems } from "./nav-items";
 
 const queryClient = new QueryClient();
@@ -32,6 +33,9 @@ const App = () => {
                 />
               );
             })}
+
+            {/* Health route for connectivity checks */}
+            <Route path="/health" element={<Health />} />
             
             {/* Dynamic routes for property components */}
             <Route 
