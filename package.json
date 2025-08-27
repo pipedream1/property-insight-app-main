@@ -8,7 +8,9 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy:pages": "wrangler pages deploy dist --project-name property-insight-app",
+    "deploy:worker": "wrangler deploy --minify --name property-insight-app"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",

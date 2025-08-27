@@ -1,0 +1,9 @@
+name = "property-insight-app"
+main = "worker/spa.ts"
+compatibility_date = "2024-09-01"
+
+# Upload the built Vite assets from the dist folder
+assets = { directory = "./dist", binding = "ASSETS" }
+
+# Optional: keep the worker small and lean
+minify = true
