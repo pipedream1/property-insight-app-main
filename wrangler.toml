@@ -7,3 +7,8 @@ assets = { directory = "./dist", binding = "ASSETS" }
 
 # Optional: keep the worker small and lean
 minify = true
+
+# Preview environment for non-production branches
+[env.preview]
+# Use a separate name so preview deploys don't overwrite production
+name = "property-insight-app-preview"
