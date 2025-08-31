@@ -31,7 +31,7 @@ const WaterReadingsPage = () => {
   const convertedReadings = readings.map(reading => ({
     id: reading.id.toString(),
     source: reading.component_type,
-    reading: reading.reading,
+  reading: Number(reading.reading ?? 0),
     readingDate: new Date(reading.date),
     createdAt: new Date(reading.created_at || reading.date),
     notes: reading.comment
@@ -45,7 +45,7 @@ const WaterReadingsPage = () => {
     return {
       id: latest.id.toString(),
       source: latest.component_type,
-      reading: latest.reading,
+  reading: Number(latest.reading ?? 0),
       readingDate: new Date(latest.date),
       createdAt: new Date(latest.created_at || latest.date),
       notes: latest.comment
@@ -96,7 +96,7 @@ const WaterReadingsPage = () => {
           </TabsContent>
 
           <TabsContent value="usage" className="mt-6">
-            <MonthlyUsageTab usageData={usageData} />
+            <MonthlyUsageTab usageData={usageData} readings={readings} />
           </TabsContent>
         </Tabs>
 

@@ -70,7 +70,7 @@ const ReadingsListDialog: React.FC<ReadingsListDialogProps> = ({
               <TableHeader>
                 <TableRow>
                   <TableHead>Date</TableHead>
-                  <TableHead>Reading (kL)</TableHead>
+                  <TableHead>Reading (L)</TableHead>
                   <TableHead>Notes</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
@@ -85,7 +85,7 @@ const ReadingsListDialog: React.FC<ReadingsListDialogProps> = ({
                       </div>
                     </TableCell>
                     <TableCell className="font-medium">
-                      {reading.reading}
+                      {typeof reading.reading === 'number' ? reading.reading.toLocaleString() + ' L' : '-'}
                     </TableCell>
                     <TableCell>
                       {reading.notes || '-'}

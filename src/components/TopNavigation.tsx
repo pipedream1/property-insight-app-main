@@ -1,7 +1,7 @@
 
 import React from 'react';
-import { Bell, User } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Bell, User, LogOut, LogIn } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -11,8 +11,21 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { OfflineSyncStatus } from '@/components/OfflineSyncStatus';
 import { navItems } from '@/nav-items';
+import { useAuth } from '@/contexts/AuthContext';
 
 const TopNavigation = () => {
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/auth');
+  };
+
+  const handleSignIn = () => {
+    navigate('/auth');
+  };
+
   return (
     <header className="bg-white border-b border-gray-200 px-4 py-3 w-full sticky top-0 z-50">
       <div className="flex items-center justify-between w-full">
@@ -57,9 +70,22 @@ const TopNavigation = () => {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem>Profile</DropdownMenuItem>
-              <DropdownMenuItem>Settings</DropdownMenuItem>
-              <DropdownMenuItem>Sign out</DropdownMenuItem>
+              {user ? (
+                <>
+                  <DropdownMenuItem disabled>
+                    {user.email ?? 'Signed in'}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleSignOut}>
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Sign out
+                  </DropdownMenuItem>
+                </>
+              ) : (
+                <DropdownMenuItem onClick={handleSignIn}>
+                  <LogIn className="h-4 w-4 mr-2" />
+                  Sign in
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

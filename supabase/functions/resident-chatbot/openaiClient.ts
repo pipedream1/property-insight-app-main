@@ -24,8 +24,8 @@ export async function testOpenAIConnection(apiKey: string) {
       throw new Error(`API test failed: ${testResponse.status} - ${errorText}`);
     }
 
-    const data = await testResponse.json();
-    console.log('✅ OpenAI API connection successful, models available:', data.data?.length || 0);
+    // Do NOT consume the body here; let the caller parse once.
+    console.log('✅ OpenAI API connection successful');
     return testResponse;
   } catch (error) {
     console.error('❌ OpenAI API connection failed:', error);

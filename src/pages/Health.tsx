@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 
 type Status = 'idle' | 'ok' | 'error';
@@ -21,7 +22,10 @@ export default function Health() {
         setPublicStatus('ok');
         setPublicDetail(`rows: ${data?.length ?? 0}`);
       } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : String(e);
+        const msg = (() => {
+          if (e instanceof Error) return e.message;
+          try { return JSON.stringify(e, null, 2); } catch { return String(e); }
+        })();
         setPublicStatus('error');
         setPublicDetail(msg);
       }
@@ -30,7 +34,7 @@ export default function Health() {
     // Auth + RLS test (only succeeds if logged in)
     (async () => {
       try {
-        const { data: userRes } = await supabase.auth.getUser();
+  const { data: userRes } = await supabase.auth.getUser();
         if (!userRes?.user) {
           setAuthStatus('error');
           setAuthDetail('No active session; login required for RLS-protected tables');
@@ -44,7 +48,10 @@ export default function Health() {
         setAuthStatus('ok');
         setAuthDetail('Authenticated query succeeded');
       } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : String(e);
+        const msg = (() => {
+          if (e instanceof Error) return e.message;
+          try { return JSON.stringify(e, null, 2); } catch { return String(e); }
+        })();
         setAuthStatus('error');
         setAuthDetail(msg);
       }
@@ -89,6 +96,18 @@ export default function Health() {
             <Badge s={authStatus} />
           </div>
           <p style={{ marginTop: 8, color: '#374151', whiteSpace: 'pre-wrap' }}>{authDetail}</p>
+          {authStatus === 'error' && authDetail.includes('No active session') && (
+            <div style={{ marginTop: 8 }}>
+              <Link to="/auth" style={{
+                display: 'inline-block',
+                padding: '6px 12px',
+                borderRadius: 6,
+                background: '#111827',
+                color: 'white',
+                textDecoration: 'none'
+              }}>Go to Sign in</Link>
+            </div>
+          )}
         </section>
       </div>
     </div>

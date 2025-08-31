@@ -14,7 +14,7 @@ import {
   generateDateRangeComparisonData 
 } from "./water/monthlyComparison";
 import { generateEmptyReport } from "./water/emptyReportGenerator";
-import { VALID_WATER_SOURCES } from "@/constants/waterSources";
+import { VALID_WATER_SOURCES, normalizeWaterSource } from "@/constants/waterSources";
 
 /**
  * Generates data for a water report using real data from the database
@@ -48,10 +48,9 @@ export const generateWaterReportData = async (selectedMonth: string, selectedYea
     console.log('Fetching water readings from database...');
     
     // Fetch actual water readings from the database
-    const { data: readings, error } = await supabase
+  const { data: readings, error } = await supabase
       .from('water_readings')
       .select('*')
-      .in('component_type', VALID_WATER_SOURCES)
       .order('date', { ascending: true });
     
     if (error) {
@@ -81,8 +80,15 @@ export const generateWaterReportData = async (selectedMonth: string, selectedYea
     }
     
     // Transform and calculate actual usage for current period
-    const currentPeriodUsage = calculatePeriodUsageFromReadings(readings, reportDate.start, reportDate.end);
-    const previousPeriodUsage = calculatePeriodUsageFromReadings(readings, previousPeriodStart, previousPeriodEnd);
+    // Normalize sources before calculations so naming differences don't exclude data
+    const normalizedReadings = (readings || []).map(r => ({
+      ...r,
+      component_type: normalizeWaterSource(r.component_type) || r.component_type,
+      component_name: normalizeWaterSource(r.component_name) || r.component_name,
+    }));
+
+    const currentPeriodUsage = calculatePeriodUsageFromReadings(normalizedReadings, reportDate.start, reportDate.end);
+    const previousPeriodUsage = calculatePeriodUsageFromReadings(normalizedReadings, previousPeriodStart, previousPeriodEnd);
     
     console.log('Current period usage:', currentPeriodUsage);
     console.log('Previous period usage:', previousPeriodUsage);

@@ -24,16 +24,16 @@ export const useInspectionManagement = (
     capturedImages: string[]
   ) => {
     try {
-      // Extract only the time portion from the date for the database
-      const timeOnly = format(inspectionDate, "HH:mm:ss'Z'");
-      
+      // Store a proper DATE value (YYYY-MM-DD) to match the column type
+      const dateOnly = format(inspectionDate, 'yyyy-MM-dd');
+
       // Store all image URLs as a JSON array - these are now Supabase Storage URLs
       const photoUrls = capturedImages.length > 0 ? JSON.stringify(capturedImages) : null;
-      
+
       const componentData = {
         component_type: componentType,
         component_name: componentName,
-        date: timeOnly,
+        date: dateOnly,
         condition: inspectionCondition,
         comment: inspectionNotes,
         photo_url: photoUrls,

@@ -9,6 +9,9 @@ export interface WaterReading {
   photo_taken: boolean | null;
   photo_url: string | null;
   created_at: string | null;
+  // Optional fields that may be provided by the canonical view
+  water_source_id?: number | null;
+  source_name?: string | null;
 }
 
 export interface ReservoirReading {

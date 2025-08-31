@@ -5,6 +5,15 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+// Valid water sources used across the estate (mirror of frontend constants)
+const VALID_WATER_SOURCES = [
+  'Borehole 1',
+  'Borehole 2',
+  'Borehole 3',
+  'Borehole 4',
+  'Knysna Water',
+];
+
 // Helper function to get current water readings
 export async function getCurrentWaterReadings() {
   try {
@@ -75,24 +84,111 @@ export async function getCurrentMonthUsage() {
       return null;
     }
     
-    // Calculate usage by source
-    const usageBySource: Record<string, { start: number; end: number; usage: number }> = {};
-    
-    data?.forEach(reading => {
-      const source = reading.component_name;
-      if (!usageBySource[source]) {
-        usageBySource[source] = { start: reading.reading, end: reading.reading, usage: 0 };
-      } else {
-        if (reading.reading > usageBySource[source].end) {
-          usageBySource[source].end = reading.reading;
-          usageBySource[source].usage = usageBySource[source].end - usageBySource[source].start;
-        }
-      }
+    // Calculate usage by source based on first vs last reading in the month
+    const grouped: Record<string, { first?: number; last?: number }> = {};
+    (data || []).forEach((r: any) => {
+      const source = r.component_type || r.component_name || 'Unknown';
+      if (!VALID_WATER_SOURCES.includes(source)) return;
+      if (!grouped[source]) grouped[source] = {};
+      const val = Number(r.reading) || 0;
+      if (grouped[source].first === undefined) grouped[source].first = val;
+      grouped[source].last = val; // readings ordered asc, so last will be latest seen
     });
+
+    const usageBySource: Record<string, number> = {};
+    Object.keys(grouped).forEach((src) => {
+      const g = grouped[src];
+      const usage = (g.last ?? 0) - (g.first ?? 0);
+      if (usage > 0) usageBySource[src] = usage;
+    });
+
+    const total = Object.values(usageBySource).reduce((a, b) => a + b, 0);
+    const daysElapsed = currentDate.getDate();
+    const avgPerDay = daysElapsed > 0 ? total / daysElapsed : 0;
     
-    return { data, usageBySource };
+    return { data, usageBySource, total, daysElapsed, avgPerDay };
   } catch (error) {
     console.error('Error in getCurrentMonthUsage:', error);
+    return null;
+  }
+}
+
+// Compute Month-To-Date (MTD) usage analytics and previous month comparison
+export async function getWaterUsageAnalytics(referenceDate?: string) {
+  try {
+    const now = referenceDate ? new Date(referenceDate) : new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+    // Current month readings ordered ASC
+    const { data: curr, error: errCurr } = await supabase
+      .from('water_readings')
+      .select('component_type, component_name, reading, date')
+      .gte('date', startOfMonth.toISOString())
+      .lte('date', endOfMonth.toISOString())
+      .order('date', { ascending: true });
+    if (errCurr) throw errCurr;
+
+    // Previous month
+    const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const prevMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+    const { data: prev, error: errPrev } = await supabase
+      .from('water_readings')
+      .select('component_type, component_name, reading, date')
+      .gte('date', prevMonthStart.toISOString())
+      .lte('date', prevMonthEnd.toISOString())
+      .order('date', { ascending: true });
+    if (errPrev) throw errPrev;
+
+    const calcUsage = (rows: any[]) => {
+      const grouped: Record<string, { first?: number; last?: number }> = {};
+      (rows || []).forEach((r: any) => {
+        const source = r.component_type || r.component_name || 'Unknown';
+        if (!VALID_WATER_SOURCES.includes(source)) return;
+        if (!grouped[source]) grouped[source] = {};
+        const val = Number(r.reading) || 0;
+        if (grouped[source].first === undefined) grouped[source].first = val;
+        grouped[source].last = val;
+      });
+      const bySource: Record<string, number> = {};
+      Object.keys(grouped).forEach((src) => {
+        const g = grouped[src];
+        const usage = (g.last ?? 0) - (g.first ?? 0);
+        if (usage > 0) bySource[src] = usage;
+      });
+      const total = Object.values(bySource).reduce((a, b) => a + b, 0);
+      return { bySource, total };
+    };
+
+    const currCalc = calcUsage(curr || []);
+    const prevCalc = calcUsage(prev || []);
+
+    const daysElapsed = now.getDate();
+    const avgPerDay = daysElapsed > 0 ? currCalc.total / daysElapsed : 0;
+    const momChangePct = prevCalc.total > 0 ? ((currCalc.total - prevCalc.total) / prevCalc.total) * 100 : null;
+
+    return {
+      period: {
+        start: startOfMonth.toISOString().slice(0, 10),
+        end: now.toISOString().slice(0, 10),
+      },
+      current: {
+        bySource: currCalc.bySource,
+        total: currCalc.total,
+        daysElapsed,
+        avgPerDay,
+        projectedEndOfMonth: Math.round(avgPerDay * endOfMonth.getDate()),
+      },
+      previousMonth: {
+        month: prevMonthStart.toISOString().slice(0, 7),
+        total: prevCalc.total,
+      },
+      comparison: {
+        momChangePct,
+      },
+    };
+  } catch (error) {
+    console.error('Error in getWaterUsageAnalytics:', error);
     return null;
   }
 }
@@ -443,6 +539,9 @@ export async function fetchRelevantData(message: string) {
 
     console.log('Database data fetched successfully');
     
+    // Compute concise water usage analytics (MTD and MoM)
+    const waterUsageAnalytics = await getWaterUsageAnalytics();
+
     return {
       waterReadings,
       maintenanceTasks, 
@@ -454,7 +553,8 @@ export async function fetchRelevantData(message: string) {
       whatsappData,
       locationTracks,
       maintenancePhotos,
-      historicalData
+      historicalData,
+      waterUsageAnalytics
     };
   } catch (error) {
     console.error('Error fetching relevant data:', error);
@@ -471,10 +571,36 @@ export function formatDataForAI(databaseData: any): string {
   let formattedData = '\n\n🏠 LIVE PROPERTY MANAGEMENT DATA:\n';
   formattedData += '=' .repeat(50) + '\n';
 
+  // Water usage analytics (Month-to-date)
+  if (databaseData.waterUsageAnalytics) {
+    const a = databaseData.waterUsageAnalytics;
+    formattedData += `\n💧 WATER USAGE ANALYTICS (Month-to-date)\n`;
+    formattedData += `Period: ${a.period.start} → ${a.period.end}\n`;
+    const bySource = a.current.bySource || {};
+    const total = a.current.total || 0;
+    const entries = Object.entries(bySource).sort(([,v1],[,v2]) => Number(v2) - Number(v1));
+    entries.slice(0, entries.length).forEach(([src, val]) => {
+      const pct = total > 0 ? Math.round((Number(val) / total) * 100) : 0;
+      formattedData += `• ${src}: ${Math.round(Number(val)).toLocaleString()} L (${pct}%)\n`;
+    });
+    formattedData += `Total: ${Math.round(total).toLocaleString()} L\n`;
+    formattedData += `Avg per day: ${Math.round(a.current.avgPerDay).toLocaleString()} L/day\n`;
+    if (a.current.projectedEndOfMonth) {
+      formattedData += `Projected month end: ${a.current.projectedEndOfMonth.toLocaleString()} L\n`;
+    }
+    if (a.previousMonth && a.previousMonth.total !== undefined) {
+      const mom = a.comparison?.momChangePct;
+      const momStr = (mom === null || mom === undefined) ? 'n/a' : `${mom >= 0 ? '+' : ''}${Math.round(mom)}%`;
+      formattedData += `Vs previous month (${a.previousMonth.month}): ${Math.round(a.previousMonth.total).toLocaleString()} L (${momStr})\n`;
+    }
+  }
+
   if (databaseData.waterReadings?.length > 0) {
-    formattedData += `\n💧 WATER READINGS (${databaseData.waterReadings.length} records):\n`;
-    databaseData.waterReadings.slice(0, 10).forEach((reading: any) => {
-      formattedData += `• ${reading.component_name}: ${reading.reading} (${new Date(reading.date).toLocaleDateString()})\n`;
+    // Keep a tiny sample only if needed; primary focus is analytics above
+    formattedData += `\n🧾 WATER READINGS SAMPLE (${Math.min(databaseData.waterReadings.length, 5)} of ${databaseData.waterReadings.length}):\n`;
+    databaseData.waterReadings.slice(0, 5).forEach((reading: any) => {
+      const name = reading.component_type || reading.component_name || 'Unknown';
+      formattedData += `• ${name}: ${reading.reading} (${new Date(reading.date).toLocaleDateString()})\n`;
     });
   }
 

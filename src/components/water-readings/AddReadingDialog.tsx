@@ -106,17 +106,20 @@ export const AddReadingDialog = ({ isOpen, onOpenChange, waterSources, onReading
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="reading">Reading (kL) *</Label>
+            <Label htmlFor="reading">Reading (L) *</Label>
             <Input
               id="reading"
               type="number"
-              step="0.1"
+              step="1"
               min="0"
               value={reading}
               onChange={(e) => setReading(e.target.value)}
-              placeholder="Enter meter reading"
+              placeholder="Enter cumulative meter reading in liters"
               required
             />
+            <p className="text-xs text-muted-foreground">
+              Tip: This is the cumulative meter value. Monthly usage is calculated from increases during the selected month.
+            </p>
           </div>
 
           <div className="space-y-2">

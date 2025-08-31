@@ -1,17 +1,26 @@
 
 import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { MonthlyUsage } from '@/types/waterReadings';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { MonthlyUsage, WaterReading } from '@/types/waterReadings';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Cell } from 'recharts';
 import { MonthSelector } from './MonthSelector';
 import { format, startOfMonth, endOfMonth, isSameMonth } from 'date-fns';
+import { VALID_WATER_SOURCES, SOURCE_COLORS } from '@/constants/waterSources';
 
 interface MonthlyUsageTabProps {
   usageData: MonthlyUsage[];
+  readings?: WaterReading[]; // optional raw readings for debug CSV export
 }
 
-export default function MonthlyUsageTab({ usageData }: MonthlyUsageTabProps) {
+export default function MonthlyUsageTab({ usageData, readings }: MonthlyUsageTabProps) {
   const [selectedMonth, setSelectedMonth] = useState(startOfMonth(new Date()));
+  const toKL = (v: number) => v / 1000;
+  const formatKL = (v: number) => {
+    const abs = Math.abs(v);
+    if (abs >= 1000) return Math.round(v).toLocaleString();
+    if (abs >= 10) return v.toFixed(1);
+    return v.toFixed(3);
+  };
   
   // Filter usage data for the selected month
   const filteredUsageData = useMemo(() => {
@@ -24,16 +33,103 @@ export default function MonthlyUsageTab({ usageData }: MonthlyUsageTabProps) {
   // Transform data for the chart to show sources side by side
   const chartData = useMemo(() => {
     if (filteredUsageData.length === 0) return [];
-    
+
     const monthData = filteredUsageData[0];
-    return monthData.sources.map(source => ({
-      name: source.source,
-      usage: source.usage,
-      fill: source.color
+    const bySource: Record<string, number> = {};
+    monthData.sources.forEach(s => { bySource[s.source] = s.usage; });
+    // Build a full list across all defined sources, fill 0s for missing
+  return VALID_WATER_SOURCES.map(src => ({
+      name: src,
+      usage: toKL(bySource[src] ?? 0),
+      fill: SOURCE_COLORS[src as keyof typeof SOURCE_COLORS] || '#666666'
     }));
   }, [filteredUsageData]);
-
   const totalUsage = filteredUsageData.length > 0 ? filteredUsageData[0].total : 0;
+  const totalUsageKL = toKL(totalUsage);
+
+  const exportMonthBreakdownCSV = () => {
+    if (!readings || readings.length === 0 || filteredUsageData.length === 0) return;
+    const monthData = filteredUsageData[0];
+    const yy = monthData.year;
+    const mm = new Date(Date.parse(monthData.month + ' 1, 2012')).getMonth() + 1;
+    const monthStart = new Date(yy, mm - 1, 1);
+    const monthEnd = new Date(yy, mm, 0);
+
+    const rows: string[] = [];
+    rows.push(['Source','StepIndex','FromDate','FromValue(L)','ToDate','ToValue(L)','Delta(L)','Delta(kL)','Note'].join(','));
+
+    // Group all readings by canonical source
+    const bySource: Record<string, WaterReading[]> = {};
+    readings.forEach(r => {
+      const src = r.component_type || r.source_name || r.component_name || 'Unknown';
+      if (!VALID_WATER_SOURCES.includes(src)) return;
+      (bySource[src] ||= []).push(r);
+    });
+    Object.values(bySource).forEach(list => list.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
+
+    VALID_WATER_SOURCES.forEach(src => {
+      const list = bySource[src] || [];
+      if (list.length === 0) return;
+      const before = list.filter(r => new Date(r.date).getTime() < monthStart.getTime());
+      const inMonth = list.filter(r => {
+        const t = new Date(r.date).getTime();
+        return t >= monthStart.getTime() && t <= monthEnd.getTime();
+      });
+
+      const seq: { date: Date; val: number }[] = [];
+      if (before.length > 0) {
+        const prev = before[before.length - 1];
+        seq.push({ date: new Date(prev.date), val: Number(prev.reading) || 0 });
+      }
+      inMonth.forEach(r => seq.push({ date: new Date(r.date), val: Number(r.reading) || 0 }));
+
+      if (seq.length >= 2) {
+        for (let i = 1; i < seq.length; i++) {
+          const from = seq[i-1];
+          const to = seq[i];
+          const delta = to.val - from.val;
+          const note = delta < 0 ? 'reset/rollback detected' : '';
+          rows.push([
+            src,
+            String(i),
+            from.date.toISOString().slice(0,10),
+            String(Math.round(from.val)),
+            to.date.toISOString().slice(0,10),
+            String(Math.round(to.val)),
+            String(Math.round(delta)),
+            (delta/1000).toFixed(3),
+            note
+          ].join(','));
+        }
+      } else if (inMonth.length === 1 && before.length > 0) {
+        // Single reading in month: baseline -> only
+        const baseline = before[before.length - 1];
+        const only = inMonth[0];
+        const fromVal = Number(baseline.reading) || 0;
+        const toVal = Number(only.reading) || 0;
+        const delta = toVal - fromVal;
+        rows.push([
+          src,
+          '1',
+          new Date(baseline.date).toISOString().slice(0,10),
+          String(Math.round(fromVal)),
+          new Date(only.date).toISOString().slice(0,10),
+          String(Math.round(toVal)),
+          String(Math.round(delta)),
+          (delta/1000).toFixed(3),
+          ''
+        ].join(','));
+      }
+    });
+
+    const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `water-usage-breakdown-${yy}-${String(mm).padStart(2,'0')}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="space-y-6">
@@ -47,11 +143,24 @@ export default function MonthlyUsageTab({ usageData }: MonthlyUsageTabProps) {
           <CardTitle className="flex items-center justify-between">
             Water Usage - {format(selectedMonth, 'MMMM yyyy')}
             <span className="text-2xl font-bold text-blue-600">
-              {totalUsage.toLocaleString()} kL
+              {formatKL(totalUsageKL)} kL
             </span>
           </CardTitle>
         </CardHeader>
         <CardContent>
+          <p className="text-sm text-gray-500 mb-3">
+            Usage is calculated from increases in cumulative meter readings during the selected month. Raw readings are in liters; chart and totals are shown in kL.
+          </p>
+          {readings && readings.length > 0 && (
+            <div className="mb-3">
+              <button
+                className="text-sm text-blue-600 hover:underline"
+                onClick={exportMonthBreakdownCSV}
+              >
+                Export month breakdown (CSV)
+              </button>
+            </div>
+          )}
           {chartData.length > 0 ? (
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
@@ -64,17 +173,22 @@ export default function MonthlyUsageTab({ usageData }: MonthlyUsageTabProps) {
                     height={80}
                     interval={0}
                   />
-                  <YAxis />
+                  <YAxis tickFormatter={(v) => formatKL(Number(v))} />
                   <Tooltip 
-                    formatter={(value) => [`${value} kL`, 'Usage']}
+                    formatter={(value) => [`${formatKL(Number(value))} kL`, 'Usage']}
                     labelStyle={{ color: '#374151' }}
+                    cursor={false}
                   />
                   <Legend />
                   <Bar 
                     dataKey="usage" 
                     name="Water Usage (kL)"
                     radius={[4, 4, 0, 0]}
-                  />
+                  >
+                    {chartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -88,27 +202,39 @@ export default function MonthlyUsageTab({ usageData }: MonthlyUsageTabProps) {
 
       {filteredUsageData.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {filteredUsageData[0].sources.map((source) => (
-            <Card key={source.source}>
+          {VALID_WATER_SOURCES.map((src) => {
+            const monthData = filteredUsageData[0];
+            const found = monthData.sources.find(s => s.source === src);
+            const usage = found ? found.usage : 0;
+                const usageKL = toKL(usage);
+            const color = SOURCE_COLORS[src as keyof typeof SOURCE_COLORS] || '#666666';
+            return (
+            <Card key={src}>
               <CardContent className="pt-6">
                 <div className="flex items-center space-x-2">
                   <div 
                     className="w-4 h-4 rounded" 
-                    style={{ backgroundColor: source.color }}
+                    style={{ backgroundColor: color }}
                   />
                   <div>
-                    <p className="text-sm font-medium text-gray-500">{source.source}</p>
-                    <p className="text-2xl font-bold" style={{ color: source.color }}>
-                      {source.usage.toLocaleString()} kL
+                    <p className="text-sm font-medium text-gray-500">{src}</p>
+                    <p className="text-2xl font-bold" style={{ color }}>
+                      {formatKL(usageKL)} kL
                     </p>
                     <p className="text-sm text-gray-500">
-                      {totalUsage > 0 ? Math.round((source.usage / totalUsage) * 100) : 0}% of total
+                      {(() => {
+                        if (totalUsage <= 0) return '0% of total';
+                        const pct = (usage / totalUsage) * 100; // unit cancels
+                        if (pct > 0 && pct < 1) return '<1% of total';
+                        return `${Math.round(pct)}% of total`;
+                      })()}
                     </p>
                   </div>
                 </div>
               </CardContent>
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

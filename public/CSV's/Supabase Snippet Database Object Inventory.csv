@@ -1,0 +1,55 @@
+schemaname,tablename,policyname,permissive,roles,cmd,qual,with_check
+public,ai_conversations,convos_modify_own,PERMISSIVE,{public},ALL,(auth.uid() = user_id),(auth.uid() = user_id)
+public,ai_conversations,convos_select_own,PERMISSIVE,{public},SELECT,(auth.uid() = user_id),null
+public,ai_messages,msgs_modify_in_own_convo,PERMISSIVE,{public},ALL,"(EXISTS ( SELECT 1
+   FROM ai_conversations c
+  WHERE ((c.id = ai_messages.conversation_id) AND (c.user_id = auth.uid()))))","(EXISTS ( SELECT 1
+   FROM ai_conversations c
+  WHERE ((c.id = ai_messages.conversation_id) AND (c.user_id = auth.uid()))))"
+public,ai_messages,msgs_select_in_own_convo,PERMISSIVE,{public},SELECT,"(EXISTS ( SELECT 1
+   FROM ai_conversations c
+  WHERE ((c.id = ai_messages.conversation_id) AND (c.user_id = auth.uid()))))",null
+public,contacts,Users can create their own contacts,PERMISSIVE,{public},INSERT,null,(auth.uid() = user_id)
+public,contacts,Users can delete their own contacts,PERMISSIVE,{public},DELETE,(auth.uid() = user_id),null
+public,contacts,Users can update their own contacts,PERMISSIVE,{public},UPDATE,(auth.uid() = user_id),null
+public,contacts,Users can view their own contacts,PERMISSIVE,{public},SELECT,(auth.uid() = user_id),null
+public,inspections,Authenticated can delete inspections,PERMISSIVE,{public},DELETE,(auth.uid() IS NOT NULL),null
+public,inspections,Authenticated can read inspections,PERMISSIVE,{public},SELECT,(auth.uid() IS NOT NULL),null
+public,inspections,Authenticated can update inspections,PERMISSIVE,{public},UPDATE,(auth.uid() IS NOT NULL),null
+public,inspections,Authenticated can write inspections,PERMISSIVE,{public},INSERT,null,(auth.uid() IS NOT NULL)
+public,location_tracks,Authenticated can read tracks,PERMISSIVE,{public},SELECT,(auth.uid() IS NOT NULL),null
+public,location_tracks,Authenticated can write tracks,PERMISSIVE,{public},INSERT,null,(auth.uid() IS NOT NULL)
+public,maintenance_photos,Authenticated can delete photos,PERMISSIVE,{public},DELETE,(auth.uid() IS NOT NULL),null
+public,maintenance_photos,Authenticated can read photos,PERMISSIVE,{public},SELECT,(auth.uid() IS NOT NULL),null
+public,maintenance_photos,Authenticated can write photos,PERMISSIVE,{public},INSERT,null,(auth.uid() IS NOT NULL)
+public,maintenance_tasks,Authenticated can delete tasks,PERMISSIVE,{public},DELETE,(auth.uid() IS NOT NULL),null
+public,maintenance_tasks,Authenticated can read tasks,PERMISSIVE,{public},SELECT,(auth.uid() IS NOT NULL),null
+public,maintenance_tasks,Authenticated can update tasks,PERMISSIVE,{public},UPDATE,(auth.uid() IS NOT NULL),null
+public,maintenance_tasks,Authenticated can write tasks,PERMISSIVE,{public},INSERT,null,(auth.uid() IS NOT NULL)
+public,pdf_chunks,Authenticated can delete pdf_chunks,PERMISSIVE,{public},DELETE,(auth.uid() IS NOT NULL),null
+public,pdf_chunks,Authenticated can read pdf_chunks,PERMISSIVE,{public},SELECT,(auth.uid() IS NOT NULL),null
+public,pdf_chunks,Authenticated can write pdf_chunks,PERMISSIVE,{public},INSERT,null,(auth.uid() IS NOT NULL)
+public,profiles,Users can update own profile,PERMISSIVE,{public},UPDATE,(auth.uid() = id),null
+public,profiles,Users can view/update own profile,PERMISSIVE,{public},SELECT,(auth.uid() = id),null
+public,property_components,Authenticated can delete components,PERMISSIVE,{public},DELETE,(auth.uid() IS NOT NULL),null
+public,property_components,Authenticated can read components,PERMISSIVE,{public},SELECT,(auth.uid() IS NOT NULL),null
+public,property_components,Authenticated can update components,PERMISSIVE,{public},UPDATE,(auth.uid() IS NOT NULL),null
+public,property_components,Authenticated can write components,PERMISSIVE,{public},INSERT,null,(auth.uid() IS NOT NULL)
+public,reports,Authenticated can delete reports,PERMISSIVE,{public},DELETE,(auth.uid() IS NOT NULL),null
+public,reports,Authenticated can read reports,PERMISSIVE,{public},SELECT,(auth.uid() IS NOT NULL),null
+public,reports,Authenticated can update reports,PERMISSIVE,{public},UPDATE,(auth.uid() IS NOT NULL),null
+public,reports,Authenticated can write reports,PERMISSIVE,{public},INSERT,null,(auth.uid() IS NOT NULL)
+public,reservoir_readings,Public can create reservoir readings,PERMISSIVE,{public},INSERT,null,true
+public,reservoir_readings,Public can delete reservoir readings,PERMISSIVE,{public},DELETE,true,null
+public,reservoir_readings,Public can update reservoir readings,PERMISSIVE,{public},UPDATE,true,null
+public,reservoir_readings,Public can view reservoir readings,PERMISSIVE,{public},SELECT,true,null
+public,water_readings,Authenticated can delete water readings,PERMISSIVE,{public},DELETE,(auth.uid() IS NOT NULL),null
+public,water_readings,Authenticated can read water readings,PERMISSIVE,{public},SELECT,(auth.uid() IS NOT NULL),null
+public,water_readings,Authenticated can update water readings,PERMISSIVE,{public},UPDATE,(auth.uid() IS NOT NULL),null
+public,water_readings,Authenticated can write water readings,PERMISSIVE,{public},INSERT,null,(auth.uid() IS NOT NULL)
+public,whatsapp_config,Authenticated can delete whatsapp_config,PERMISSIVE,{public},DELETE,(auth.uid() IS NOT NULL),null
+public,whatsapp_config,Authenticated can read whatsapp_config,PERMISSIVE,{public},SELECT,(auth.uid() IS NOT NULL),null
+public,whatsapp_config,Authenticated can update whatsapp_config,PERMISSIVE,{public},UPDATE,(auth.uid() IS NOT NULL),null
+public,whatsapp_config,Authenticated can write whatsapp_config,PERMISSIVE,{public},INSERT,null,(auth.uid() IS NOT NULL)
+public,whatsapp_messages,Authenticated can read whatsapp_messages,PERMISSIVE,{public},SELECT,(auth.uid() IS NOT NULL),null
+public,whatsapp_messages,Authenticated can write whatsapp_messages,PERMISSIVE,{public},INSERT,null,(auth.uid() IS NOT NULL)

@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Home, Wrench, FileText, Droplets, MessageSquare, Phone, Star, Users, Brain, Camera } from "lucide-react";
+import { Home, Wrench, FileText, Droplets, MessageSquare, Phone, Star, Users, Brain, Camera, Shield } from "lucide-react";
 import Index from "./pages/Index";
 import PropertyComponents from "./pages/PropertyComponents";
 import Maintenance from "./pages/Maintenance";
@@ -11,6 +11,8 @@ import PremiumReports from "./pages/PremiumReports";
 import Community from "./pages/Community";
 import Contacts from "./pages/Contacts";
 import AIInsights from "./pages/AIInsights";
+import AdminAliases from "./pages/AdminAliases";
+// Health route remains available directly via /health, but it is removed from navigation.
 
 /**
  * Central place to define the navigation items. Used for navigation components and routing.
@@ -76,4 +78,11 @@ export const navItems = [
     icon: <Phone className="h-4 w-4" />,
     page: <Contacts />,
   },
+  {
+    title: "Admin: Aliases",
+    to: "/admin/aliases",
+    icon: <Shield className="h-4 w-4" />,
+    page: <AdminAliases />,
+  },
+  // Health was intentionally removed from the visible nav.
 ];

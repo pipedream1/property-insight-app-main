@@ -1,0 +1,10 @@
+table_schema,table_name,column_name
+public,water_readings,comment
+public,water_readings,component_name
+public,water_readings,component_type
+public,water_readings,created_at
+public,water_readings,date
+public,water_readings,id
+public,water_readings,photo_taken
+public,water_readings,photo_url
+public,water_readings,reading

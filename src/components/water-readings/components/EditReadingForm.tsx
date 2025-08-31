@@ -46,13 +46,15 @@ const EditReadingForm: React.FC<EditReadingFormProps> = ({
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="reading">Reading Value</Label>
+        <Label htmlFor="reading">Reading (L)</Label>
         <Input
           id="reading"
           type="number"
+          step="1"
+          min="0"
           value={readingValue}
           onChange={(e) => setReadingValue(e.target.value)}
-          placeholder="Enter meter reading"
+          placeholder="Enter cumulative meter reading in liters"
         />
       </div>
       <div className="space-y-2">
