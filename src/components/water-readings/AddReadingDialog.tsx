@@ -12,16 +12,17 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { WaterSourceOption } from '@/api/waterReadingsApi';
 
 interface AddReadingDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  waterSources: Array<{ value: string; label: string }>;
+  waterSources: WaterSourceOption[];
   onReadingSaved: () => void;
 }
 
 export const AddReadingDialog = ({ isOpen, onOpenChange, waterSources, onReadingSaved }: AddReadingDialogProps) => {
-  const [selectedSource, setSelectedSource] = useState('');
+  const [selectedSourceId, setSelectedSourceId] = useState<string>('');
   const [reading, setReading] = useState('');
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [notes, setNotes] = useState('');
@@ -30,7 +31,7 @@ export const AddReadingDialog = ({ isOpen, onOpenChange, waterSources, onReading
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!selectedSource || !reading.trim()) {
+    if (!selectedSourceId || !reading.trim()) {
       toast.error('Please fill in all required fields');
       return;
     }
@@ -48,8 +49,7 @@ export const AddReadingDialog = ({ isOpen, onOpenChange, waterSources, onReading
         .from('water_readings')
         .insert([
           {
-            component_type: selectedSource,
-            component_name: selectedSource, // Set component_name to match component_type for consistency
+            water_source_id: parseInt(selectedSourceId),
             reading: readingValue,
             date: selectedDate.toISOString(),
             comment: notes.trim() || null,
@@ -69,7 +69,7 @@ export const AddReadingDialog = ({ isOpen, onOpenChange, waterSources, onReading
       onOpenChange(false);
       
       // Reset form
-      setSelectedSource('');
+      setSelectedSourceId('');
       setReading('');
       setSelectedDate(new Date());
       setNotes('');
@@ -91,13 +91,13 @@ export const AddReadingDialog = ({ isOpen, onOpenChange, waterSources, onReading
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="source">Water Source *</Label>
-            <Select value={selectedSource} onValueChange={setSelectedSource}>
+            <Select value={selectedSourceId} onValueChange={setSelectedSourceId}>
               <SelectTrigger>
                 <SelectValue placeholder="Select water source" />
               </SelectTrigger>
               <SelectContent>
                 {waterSources.map((source) => (
-                  <SelectItem key={source.value} value={source.value}>
+                  <SelectItem key={source.id} value={source.id.toString()}>
                     {source.label}
                   </SelectItem>
                 ))}

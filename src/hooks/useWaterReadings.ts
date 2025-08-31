@@ -1,12 +1,13 @@
 
 import { useState, useEffect } from 'react';
 import { WaterReading, ReservoirReading } from '@/types/waterReadings';
-import { fetchWaterReadings, fetchReservoirReadings } from '@/api/waterReadingsApi';
+import { fetchWaterReadings, fetchReservoirReadings, fetchWaterSourcesWithIds, WaterSourceOption } from '@/api/waterReadingsApi';
 import { calculateUsageData, getLatestReadingBySource } from '@/utils/waterReadingCalculations';
 
 export const useWaterReadings = () => {
   const [readings, setReadings] = useState<WaterReading[]>([]);
   const [reservoirReadings, setReservoirReadings] = useState<ReservoirReading[]>([]);
+  const [waterSources, setWaterSources] = useState<WaterSourceOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchReadings = async () => {
@@ -19,10 +20,15 @@ export const useWaterReadings = () => {
     setReservoirReadings(data);
   };
 
+  const fetchSources = async () => {
+    const data = await fetchWaterSourcesWithIds();
+    setWaterSources(data);
+  };
+
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
-      await Promise.all([fetchReadings(), fetchReservoir()]);
+      await Promise.all([fetchReadings(), fetchReservoir(), fetchSources()]);
       setIsLoading(false);
     };
 
@@ -36,9 +42,11 @@ export const useWaterReadings = () => {
   return {
     readings,
     reservoirReadings,
+    waterSources,
     isLoading,
     fetchReadings,
     fetchReservoirReadings: fetchReservoir,
+    fetchWaterSources: fetchSources,
     calculateUsageData: () => usageData,
     getLatestReadingBySource: getLatestReading,
   };

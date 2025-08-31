@@ -89,3 +89,47 @@ export const fetchReservoirReadings = async (): Promise<ReservoirReading[]> => {
     return [];
   }
 };
+
+export interface WaterSourceOption {
+  id: number;
+  name: string;
+  label: string;
+}
+
+export const fetchWaterSourcesWithIds = async (): Promise<WaterSourceOption[]> => {
+  try {
+    console.log('Fetching active water sources with IDs...');
+    
+    // Use raw query since water_sources table might not be in generated types yet
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result = await (supabase as any)
+      .from('water_sources')
+      .select('id, name')
+      .eq('is_active', true)
+      .order('name', { ascending: true });
+    
+    if (result.error) {
+      console.error('Error fetching water sources:', result.error);
+      toast.error('Failed to fetch water sources');
+      return [];
+    }
+    
+    interface WaterSourceRow {
+      id: number;
+      name: string;
+    }
+    
+    const sources: WaterSourceOption[] = (result.data || []).map((source: WaterSourceRow) => ({
+      id: source.id,
+      name: source.name,
+      label: source.name
+    }));
+
+    console.log(`Fetched ${sources.length} active water sources`);
+    return sources;
+  } catch (error) {
+    console.error('Error fetching water sources:', error);
+    toast.error('Failed to fetch water sources');
+    return [];
+  }
+};

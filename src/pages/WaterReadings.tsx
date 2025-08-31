@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import TopNavigation from '@/components/TopNavigation';
-import { useWaterReadings, WATER_SOURCES } from '@/hooks/useWaterReadings';
+import { useWaterReadings } from '@/hooks/useWaterReadings';
 import AddReadingDialog from '@/components/water-readings/AddReadingDialog';
 import ReadingsTab from '@/components/water-readings/ReadingsTab';
 import MonthlyUsageTab from '@/components/water-readings/MonthlyUsageTab';
@@ -14,6 +14,7 @@ const WaterReadingsPage = () => {
   const { 
     readings, 
     reservoirReadings,
+    waterSources,
     isLoading, 
     fetchReadings, 
     fetchReservoirReadings,
@@ -52,6 +53,12 @@ const WaterReadingsPage = () => {
     };
   };
 
+  // Convert waterSources for backwards compatibility with ReadingsTab
+  const legacyWaterSources = waterSources.map(source => ({
+    value: source.name,
+    label: source.label
+  }));
+
   console.log('WaterReadings Debug:', { 
     readings: readings.length, 
     convertedReadings: convertedReadings.length,
@@ -77,7 +84,7 @@ const WaterReadingsPage = () => {
 
           <TabsContent value="readings" className="mt-6">
             <ReadingsTab
-              waterSources={WATER_SOURCES.filter(source => source.value !== 'Reservoir')}
+              waterSources={legacyWaterSources}
               readings={convertedReadings}
               isLoading={isLoading}
               onAddReading={() => setIsAddingReading(true)}
@@ -103,7 +110,7 @@ const WaterReadingsPage = () => {
         <AddReadingDialog
           isOpen={isAddingReading}
           onOpenChange={setIsAddingReading}
-          waterSources={WATER_SOURCES.filter(source => source.value !== 'Reservoir')}
+          waterSources={waterSources}
           onReadingSaved={handleReadingUpdated}
         />
       </main>
