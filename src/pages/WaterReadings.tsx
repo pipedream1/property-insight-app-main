@@ -62,6 +62,7 @@ const WaterReadingsPage = () => {
   console.log('WaterReadings Debug:', { 
     readings: readings.length, 
     convertedReadings: convertedReadings.length,
+    waterSources: waterSources.length,
     isLoading 
   });
 
