@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -17,16 +17,20 @@ export const ReservoirCard = ({ readings, onReadingAdded }: ReservoirCardProps) 
   const [isEditingReading, setIsEditingReading] = useState(false);
   
   // Use actual readings from database, fallback to default values if no readings exist
-  const latestReading = readings.length > 0 
-    ? readings.sort((a, b) => new Date(b.reading_date).getTime() - new Date(a.reading_date).getTime())[0]
-    : {
-        id: 'default',
-        reading_date: new Date().toISOString(),
-        water_level: 4.0, // Default physical depth: 4 meters
-        percentage_full: 80.0, // Default electronic meter reading
-        notes: 'Default reading - Please add actual measurements',
-        created_at: new Date().toISOString()
-      };
+  const latestReading = useMemo(() => {
+    if (readings.length > 0) {
+      const sorted = [...readings].sort((a, b) => new Date(b.reading_date).getTime() - new Date(a.reading_date).getTime());
+      return sorted[0];
+    }
+    return {
+      id: 'default',
+      reading_date: new Date().toISOString(),
+      water_level: 4.0, // Default physical depth: 4 meters
+      percentage_full: 80.0, // Default electronic meter reading
+      notes: 'Default reading - Please add actual measurements',
+      created_at: new Date().toISOString()
+    };
+  }, [readings]);
 
   const getStatusColor = (percentage: number) => {
     if (percentage >= 80) return 'bg-green-500';
@@ -44,13 +48,10 @@ export const ReservoirCard = ({ readings, onReadingAdded }: ReservoirCardProps) 
 
   const getTrend = () => {
     if (readings.length < 2) return null;
-    
-    const sortedReadings = readings.sort((a, b) => new Date(a.reading_date).getTime() - new Date(b.reading_date).getTime());
+    const sortedReadings = [...readings].sort((a, b) => new Date(a.reading_date).getTime() - new Date(b.reading_date).getTime());
     const latest = sortedReadings[sortedReadings.length - 1];
     const previous = sortedReadings[sortedReadings.length - 2];
-    
     const diff = latest.percentage_full - previous.percentage_full;
-    
     if (diff > 2) return { trend: 'up', icon: TrendingUp, color: 'text-green-600' };
     if (diff < -2) return { trend: 'down', icon: TrendingDown, color: 'text-red-600' };
     return { trend: 'stable', icon: Minus, color: 'text-gray-600' };
@@ -78,15 +79,17 @@ export const ReservoirCard = ({ readings, onReadingAdded }: ReservoirCardProps) 
               <span>Reservoir</span>
             </div>
             <div className="flex gap-2">
-              <Button 
-                size="sm" 
-                variant="outline"
-                onClick={() => setIsEditingReading(true)}
-                className="h-8"
-              >
-                <Edit3 className="h-4 w-4 mr-1" />
-                Edit
-              </Button>
+              {readings.length > 0 && (
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={() => setIsEditingReading(true)}
+                  className="h-8"
+                >
+                  <Edit3 className="h-4 w-4 mr-1" />
+                  Edit
+                </Button>
+              )}
               <Button 
                 size="sm" 
                 onClick={() => setIsAddingReading(true)}
