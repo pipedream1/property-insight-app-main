@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,7 @@ import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { WaterSourceOption } from '@/api/waterReadingsApi';
+import { addPendingReading, trySyncPendingReadings } from '@/utils/storage/pendingReadings';
 
 interface AddReadingDialogProps {
   isOpen: boolean;
@@ -27,6 +28,36 @@ export const AddReadingDialog = ({ isOpen, onOpenChange, waterSources, onReading
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Try syncing any pending items whenever dialog opens
+  useEffect(() => {
+    const doSync = async () => {
+      if (!isOpen) return;
+      const res = await trySyncPendingReadings(async (r) => {
+        // prefer FK if provided
+        if (r.water_source_id) {
+          const fk = await supabase.from('water_readings').insert([{ ...r }]);
+          if (!fk.error) return { error: null };
+        }
+        return await supabase.from('water_readings').insert([
+          {
+            component_type: r.component_type,
+            component_name: r.component_name,
+            reading: r.reading,
+            date: r.date,
+            comment: r.comment,
+            photo_taken: false,
+            photo_url: null,
+          },
+        ]);
+      });
+      if (res.success > 0) {
+        toast.success(`Synced ${res.success} pending reading${res.success > 1 ? 's' : ''}`);
+        onReadingSaved();
+      }
+    };
+    void doSync();
+  }, [isOpen, onReadingSaved]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,22 +76,65 @@ export const AddReadingDialog = ({ isOpen, onOpenChange, waterSources, onReading
     setIsSubmitting(true);
 
     try {
-      const { error } = await supabase
-        .from('water_readings')
-        .insert([
-          {
-            water_source_id: parseInt(selectedSourceId),
-            reading: readingValue,
-            date: selectedDate.toISOString(),
-            comment: notes.trim() || null,
-            photo_taken: false,
-            photo_url: null,
-          },
-        ]);
+      // Find the selected water source to get its name and fallback flag
+      const selectedWaterSource = waterSources.find(source => source.id.toString() === selectedSourceId);
+
+      let error: { message: string } | null = null;
+
+      if (selectedWaterSource && !selectedWaterSource.isFallback) {
+        // New schema path with FK only when the option came from DB
+        const res = await supabase
+          .from('water_readings')
+          .insert([
+            {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              ...( { water_source_id: parseInt(selectedSourceId) } as any ),
+              reading: readingValue,
+              date: selectedDate.toISOString(),
+              comment: notes.trim() || null,
+              photo_taken: false,
+              photo_url: null,
+            },
+          ]);
+        error = res.error;
+        if (error) console.warn('FK insert failed, will try legacy:', error.message);
+      }
+
+      if (error || !selectedWaterSource || selectedWaterSource.isFallback) {
+        // Legacy schema path using component_type/name
+        const legacyResult = await supabase
+          .from('water_readings')
+          .insert([
+            {
+              component_type: selectedWaterSource?.name ?? 'Unknown',
+              component_name: selectedWaterSource?.name ?? 'Unknown',
+              reading: readingValue,
+              date: selectedDate.toISOString(),
+              comment: notes.trim() || null,
+              photo_taken: false,
+              photo_url: null,
+            },
+          ]);
+        error = legacyResult.error;
+      }
 
       if (error) {
         console.error('Error saving water reading:', error);
-        toast.error('Failed to save reading');
+        // If blocked by RLS, queue locally and inform the user.
+        if (error.message?.toLowerCase().includes('row-level security')) {
+          addPendingReading({
+            component_type: selectedWaterSource?.name ?? 'Unknown',
+            component_name: selectedWaterSource?.name ?? 'Unknown',
+            water_source_id: selectedWaterSource?.isFallback ? undefined : parseInt(selectedSourceId),
+            reading: readingValue,
+            date: selectedDate.toISOString(),
+            comment: notes.trim() || null,
+          });
+          toast.info('You are not permitted to write yet. Saved offline and will sync automatically when permissions/migrations are applied.');
+          onOpenChange(false);
+        } else {
+          toast.error(`Failed to save reading: ${error.message}`);
+        }
         return;
       }
 
@@ -96,6 +170,11 @@ export const AddReadingDialog = ({ isOpen, onOpenChange, waterSources, onReading
                 <SelectValue placeholder="Select water source" />
               </SelectTrigger>
               <SelectContent>
+                {waterSources.length === 0 && (
+                  <SelectItem value="__none__" disabled>
+                    No sources available (check connectivity)
+                  </SelectItem>
+                )}
                 {waterSources.map((source) => (
                   <SelectItem key={source.id} value={source.id.toString()}>
                     {source.label}

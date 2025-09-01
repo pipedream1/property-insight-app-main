@@ -2,7 +2,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { WaterReading, ReservoirReading } from '@/types/waterReadings';
-import { VALID_WATER_SOURCES, normalizeWaterSource } from '@/constants/waterSources';
+import { VALID_WATER_SOURCES, WATER_SOURCES, normalizeWaterSource } from '@/constants/waterSources';
 
 export const fetchWaterReadings = async (): Promise<WaterReading[]> => {
   try {
@@ -94,6 +94,8 @@ export interface WaterSourceOption {
   id: number;
   name: string;
   label: string;
+  // true when sourced from static constants instead of DB (e.g., before migrations or blocked by RLS)
+  isFallback?: boolean;
 }
 
 export const fetchWaterSourcesWithIds = async (): Promise<WaterSourceOption[]> => {
@@ -108,10 +110,24 @@ export const fetchWaterSourcesWithIds = async (): Promise<WaterSourceOption[]> =
       .eq('is_active', true)
       .order('name', { ascending: true });
     
-    if (result.error) {
-      console.error('Error fetching water sources:', result.error);
-      toast.error('Failed to fetch water sources');
-      return [];
+    // If the table doesn't exist, query fails, or returns no rows (e.g., blocked by RLS), fall back to static constants
+    if (result.error || !Array.isArray(result.data) || result.data.length === 0) {
+      if (result?.error) {
+        console.warn('Water sources query errored, using static fallback:', result.error.message);
+      } else {
+        console.warn('Water sources query returned 0 rows (possibly RLS). Using static fallback.');
+      }
+      
+      // Create fallback data from constants using index as ID
+      const fallbackSources: WaterSourceOption[] = WATER_SOURCES.map((source, index) => ({
+        id: index + 1, // Use index + 1 as temporary ID
+        name: source.value,
+        label: source.label,
+        isFallback: true,
+      }));
+      
+      console.log(`Using ${fallbackSources.length} fallback water sources from constants`);
+      return fallbackSources;
     }
     
     interface WaterSourceRow {
@@ -119,17 +135,26 @@ export const fetchWaterSourcesWithIds = async (): Promise<WaterSourceOption[]> =
       name: string;
     }
     
-    const sources: WaterSourceOption[] = (result.data || []).map((source: WaterSourceRow) => ({
+  const sources: WaterSourceOption[] = (result.data || []).map((source: WaterSourceRow) => ({
       id: source.id,
       name: source.name,
       label: source.name
     }));
 
-    console.log(`Fetched ${sources.length} active water sources`);
+    console.log(`Fetched ${sources.length} active water sources from database`);
     return sources;
   } catch (error) {
-    console.error('Error fetching water sources:', error);
-    toast.error('Failed to fetch water sources');
-    return [];
+    console.warn('Error fetching water sources, using static fallback:', error);
+    
+    // Create fallback data from constants using index as ID
+      const fallbackSources: WaterSourceOption[] = WATER_SOURCES.map((source, index) => ({
+      id: index + 1, // Use index + 1 as temporary ID
+      name: source.value,
+        label: source.label,
+        isFallback: true,
+    }));
+    
+    console.log(`Using ${fallbackSources.length} fallback water sources from constants`);
+    return fallbackSources;
   }
 };

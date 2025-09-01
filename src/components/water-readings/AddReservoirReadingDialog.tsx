@@ -12,6 +12,7 @@ import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { ReservoirReading } from '@/hooks/useWaterReadings';
+import { addPendingReservoirReading, trySyncPendingReservoirReadings } from '@/utils/storage/pendingReservoirReadings';
 
 interface AddReservoirReadingDialogProps {
   isOpen: boolean;
@@ -31,6 +32,21 @@ export const AddReservoirReadingDialog = ({
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Try to sync pending reservoir readings whenever dialog opens
+  useEffect(() => {
+    const doSync = async () => {
+      if (!isOpen) return;
+      const res = await trySyncPendingReservoirReadings(async (r) => {
+        return await supabase.from('reservoir_readings').insert([{ ...r }]);
+      });
+      if (res.success > 0) {
+        toast.success(`Synced ${res.success} pending reservoir reading${res.success>1?'s':''}`);
+        onReadingSaved();
+      }
+    };
+    void doSync();
+  }, [isOpen, onReadingSaved]);
 
   useEffect(() => {
     if (editingReading && editingReading.id !== 'default') {
@@ -83,7 +99,7 @@ export const AddReservoirReadingDialog = ({
         notes: notes.trim() || null,
       };
 
-      let error;
+  let error;
 
       if (editingReading && editingReading.id !== 'default') {
         // Update existing reading
@@ -102,7 +118,13 @@ export const AddReservoirReadingDialog = ({
 
       if (error) {
         console.error('Error saving reservoir reading:', error);
-        toast.error('Failed to save reading');
+        if (String(error.message || '').toLowerCase().includes('row-level security')) {
+          addPendingReservoirReading(readingData);
+          toast.info('No permission to write yet. Reading saved offline and will sync automatically once permissions are applied.');
+          onOpenChange(false);
+        } else {
+          toast.error(`Failed to save reading: ${error.message}`);
+        }
         return;
       }
 

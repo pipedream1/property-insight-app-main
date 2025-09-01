@@ -1,8 +1,8 @@
 
 import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { MonthlyUsage, WaterReading } from '@/types/waterReadings';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Cell } from 'recharts';
+import { MonthlyUsage, WaterReading, ReservoirReading } from '@/types/waterReadings';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Cell, LineChart, Line } from 'recharts';
 import { MonthSelector } from './MonthSelector';
 import { format, startOfMonth, endOfMonth, isSameMonth } from 'date-fns';
 import { VALID_WATER_SOURCES, SOURCE_COLORS } from '@/constants/waterSources';
@@ -10,9 +10,10 @@ import { VALID_WATER_SOURCES, SOURCE_COLORS } from '@/constants/waterSources';
 interface MonthlyUsageTabProps {
   usageData: MonthlyUsage[];
   readings?: WaterReading[]; // optional raw readings for debug CSV export
+  reservoirReadings?: ReservoirReading[]; // optional reservoir readings for level chart
 }
 
-export default function MonthlyUsageTab({ usageData, readings }: MonthlyUsageTabProps) {
+export default function MonthlyUsageTab({ usageData, readings, reservoirReadings }: MonthlyUsageTabProps) {
   const [selectedMonth, setSelectedMonth] = useState(startOfMonth(new Date()));
   const toKL = (v: number) => v / 1000;
   const formatKL = (v: number) => {
@@ -46,6 +47,23 @@ export default function MonthlyUsageTab({ usageData, readings }: MonthlyUsageTab
   }, [filteredUsageData]);
   const totalUsage = filteredUsageData.length > 0 ? filteredUsageData[0].total : 0;
   const totalUsageKL = toKL(totalUsage);
+
+  // Reservoir chart data for the selected month
+  const reservoirChartData = useMemo(() => {
+    if (!reservoirReadings || reservoirReadings.length === 0) return [] as { date: Date; label: string; percentage: number; level: number }[];
+    const monthFiltered = reservoirReadings
+      .filter(r => isSameMonth(new Date(r.reading_date), selectedMonth))
+      .sort((a, b) => new Date(a.reading_date).getTime() - new Date(b.reading_date).getTime());
+    return monthFiltered.map(r => {
+      const d = new Date(r.reading_date);
+      return {
+        date: d,
+        label: format(d, 'd MMM'),
+        percentage: Number(r.percentage_full ?? 0),
+        level: Number(r.water_level ?? 0),
+      };
+    });
+  }, [reservoirReadings, selectedMonth]);
 
   const exportMonthBreakdownCSV = () => {
     if (!readings || readings.length === 0 || filteredUsageData.length === 0) return;
@@ -195,6 +213,49 @@ export default function MonthlyUsageTab({ usageData, readings }: MonthlyUsageTab
           ) : (
             <div className="text-center text-gray-500 py-8">
               No usage data available for {format(selectedMonth, 'MMMM yyyy')}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Reservoir Levels over the selected month */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            Reservoir Levels - {format(selectedMonth, 'MMMM yyyy')}
+            {reservoirChartData.length > 0 && (
+              <span className="text-sm font-medium text-gray-500">{reservoirChartData.length} reading{reservoirChartData.length > 1 ? 's' : ''}</span>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-gray-500 mb-3">
+            Daily reservoir percentage full for the selected month. Values are from reservoir readings.
+          </p>
+          {reservoirChartData.length > 0 ? (
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={reservoirChartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="label" interval={0} angle={-45} textAnchor="end" height={80} />
+                  <YAxis domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
+                  <Tooltip 
+                    formatter={(value: number, name: string) => {
+                      if (name === 'percentage') return [`${value.toFixed(0)}%`, 'Percent Full'];
+                      if (name === 'level') return [`${value}`, 'Level'];
+                      return [String(value), name];
+                    }}
+                    labelFormatter={(label: string) => label}
+                    cursor={{ stroke: '#94a3b8', strokeDasharray: '4 4' }}
+                  />
+                  <Legend />
+                  <Line type="monotone" dataKey="percentage" name="Percent Full" stroke="#0ea5e9" strokeWidth={2} dot={{ r: 2 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="text-center text-gray-500 py-8">
+              No reservoir level data for {format(selectedMonth, 'MMMM yyyy')}
             </div>
           )}
         </CardContent>

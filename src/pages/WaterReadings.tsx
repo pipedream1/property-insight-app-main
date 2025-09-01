@@ -66,6 +66,9 @@ const WaterReadingsPage = () => {
     isLoading 
   });
 
+  // Lightweight UI hint when no sources are available (should rarely happen due to fallbacks)
+  const noSources = !isLoading && waterSources.length === 0;
+
   return (
     <div className="min-h-screen bg-gray-50">
       <TopNavigation />
@@ -75,6 +78,12 @@ const WaterReadingsPage = () => {
         <div className="flex justify-center items-center mb-6">
           <h1 className="text-2xl font-bold">Water Readings</h1>
         </div>
+
+        {noSources && (
+          <div className="mb-4 rounded-md border border-yellow-300 bg-yellow-50 p-3 text-sm text-yellow-900">
+            No water sources were loaded. We'll try using built-in defaults, but please check your connection or run the DB migrations.
+          </div>
+        )}
 
         <Tabs defaultValue="readings">
           <TabsList className="grid w-full grid-cols-3">
@@ -104,7 +113,7 @@ const WaterReadingsPage = () => {
           </TabsContent>
 
           <TabsContent value="usage" className="mt-6">
-            <MonthlyUsageTab usageData={usageData} readings={readings} />
+            <MonthlyUsageTab usageData={usageData} readings={readings} reservoirReadings={reservoirReadings} />
           </TabsContent>
         </Tabs>
 
