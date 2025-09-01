@@ -218,7 +218,45 @@ export default function MonthlyUsageTab({ usageData, readings, reservoirReadings
         </CardContent>
       </Card>
 
-      {/* Reservoir Levels over the selected month */}
+      {filteredUsageData.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {VALID_WATER_SOURCES.map((src) => {
+            const monthData = filteredUsageData[0];
+            const found = monthData.sources.find(s => s.source === src);
+            const usage = found ? found.usage : 0;
+                const usageKL = toKL(usage);
+            const color = SOURCE_COLORS[src as keyof typeof SOURCE_COLORS] || '#666666';
+            return (
+            <Card key={src}>
+              <CardContent className="pt-6">
+                <div className="flex items-center space-x-2">
+                  <div 
+                    className="w-4 h-4 rounded" 
+                    style={{ backgroundColor: color }}
+                  />
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">{src}</p>
+                    <p className="text-2xl font-bold" style={{ color }}>
+                      {formatKL(usageKL)} kL
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      {(() => {
+                        if (totalUsage <= 0) return '0% of total';
+                        const pct = (usage / totalUsage) * 100; // unit cancels
+                        if (pct > 0 && pct < 1) return '<1% of total';
+                        return `${Math.round(pct)}% of total`;
+                      })()}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Reservoir Levels over the selected month (moved below per-source figures) */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
@@ -260,44 +298,6 @@ export default function MonthlyUsageTab({ usageData, readings, reservoirReadings
           )}
         </CardContent>
       </Card>
-
-      {filteredUsageData.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {VALID_WATER_SOURCES.map((src) => {
-            const monthData = filteredUsageData[0];
-            const found = monthData.sources.find(s => s.source === src);
-            const usage = found ? found.usage : 0;
-                const usageKL = toKL(usage);
-            const color = SOURCE_COLORS[src as keyof typeof SOURCE_COLORS] || '#666666';
-            return (
-            <Card key={src}>
-              <CardContent className="pt-6">
-                <div className="flex items-center space-x-2">
-                  <div 
-                    className="w-4 h-4 rounded" 
-                    style={{ backgroundColor: color }}
-                  />
-                  <div>
-                    <p className="text-sm font-medium text-gray-500">{src}</p>
-                    <p className="text-2xl font-bold" style={{ color }}>
-                      {formatKL(usageKL)} kL
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      {(() => {
-                        if (totalUsage <= 0) return '0% of total';
-                        const pct = (usage / totalUsage) * 100; // unit cancels
-                        if (pct > 0 && pct < 1) return '<1% of total';
-                        return `${Math.round(pct)}% of total`;
-                      })()}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 }
