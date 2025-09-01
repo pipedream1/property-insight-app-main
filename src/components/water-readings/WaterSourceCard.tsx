@@ -23,6 +23,13 @@ const WaterSourceCard: React.FC<WaterSourceCardProps> = ({
   onViewAllReadings,
   onEditLatest
 }) => {
+  const toKL = (v: number) => v / 1000;
+  const formatKL = (v: number) => {
+    const abs = Math.abs(v);
+    if (abs >= 1000) return Math.round(v).toLocaleString();
+    if (abs >= 10) return v.toFixed(1);
+    return v.toFixed(3);
+  };
   return (
     <Card key={sourceName} className="overflow-hidden">
       <CardHeader className="bg-primary-50 pb-3">
@@ -36,7 +43,7 @@ const WaterSourceCard: React.FC<WaterSourceCardProps> = ({
         ) : latestReading ? (
           <div className="space-y-3">
             <div className="text-2xl font-bold">
-              {latestReading.reading.toLocaleString()} L
+              {formatKL(toKL(latestReading.reading))} kL
             </div>
             <div className="text-sm text-muted-foreground">
               Latest: {latestReading.readingDate.toLocaleDateString()}
