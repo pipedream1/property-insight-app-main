@@ -1,11 +1,12 @@
 
 import React from 'react';
-import { Home, Wrench, FileText, Droplets, MessageSquare, Phone, Star, Users, Brain, Camera, Shield } from "lucide-react";
+import { Home, Wrench, FileText, Droplets, MessageSquare, Phone, Star, Users, Brain, Camera, Shield, ClipboardCheck } from "lucide-react";
 import Index from "./pages/Index";
 import PropertyComponents from "./pages/PropertyComponents";
 import Maintenance from "./pages/Maintenance";
 import Reports from "./pages/Reports";
 import WaterReadings from "./pages/WaterReadings";
+import Inspections from "./pages/Inspections";
 import WhatsAppIntegration from "./pages/WhatsAppIntegration";
 import PremiumReports from "./pages/PremiumReports";
 import Community from "./pages/Community";
@@ -41,6 +42,12 @@ export const navItems = [
     to: "/water-readings",
     icon: <Droplets className="h-4 w-4" />,
     page: <WaterReadings />,
+  },
+  {
+    title: "Inspections",
+    to: "/inspections",
+    icon: <ClipboardCheck className="h-4 w-4" />,
+    page: <Inspections />,
   },
   {
     title: "Reports",

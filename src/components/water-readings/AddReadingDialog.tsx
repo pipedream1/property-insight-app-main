@@ -14,6 +14,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { WaterSourceOption } from '@/api/waterReadingsApi';
 import { addPendingReading, trySyncPendingReadings } from '@/utils/storage/pendingReadings';
+import { getSupabaseConfigSummary, pingSupabaseAuthHealth, isLikelyNetworkError } from '@/integrations/supabase/diagnostics';
 
 interface AddReadingDialogProps {
   isOpen: boolean;
@@ -120,8 +121,9 @@ export const AddReadingDialog = ({ isOpen, onOpenChange, waterSources, onReading
 
       if (error) {
         console.error('Error saving water reading:', error);
+        const lower = String(error.message || '').toLowerCase();
         // If blocked by RLS, queue locally and inform the user.
-        if (error.message?.toLowerCase().includes('row-level security')) {
+        if (lower.includes('row-level security')) {
           addPendingReading({
             component_type: selectedWaterSource?.name ?? 'Unknown',
             component_name: selectedWaterSource?.name ?? 'Unknown',
@@ -131,6 +133,21 @@ export const AddReadingDialog = ({ isOpen, onOpenChange, waterSources, onReading
             comment: notes.trim() || null,
           });
           toast.info('You are not permitted to write yet. Saved offline and will sync automatically when permissions/migrations are applied.');
+          onOpenChange(false);
+  } else if (isLikelyNetworkError(error.message)) {
+          // Treat as offline/network issue: queue locally
+          addPendingReading({
+            component_type: selectedWaterSource?.name ?? 'Unknown',
+            component_name: selectedWaterSource?.name ?? 'Unknown',
+            water_source_id: selectedWaterSource?.isFallback ? undefined : parseInt(selectedSourceId),
+            reading: readingValue,
+            date: selectedDate.toISOString(),
+            comment: notes.trim() || null,
+          });
+          const cfg = getSupabaseConfigSummary();
+          const health = await pingSupabaseAuthHealth(3000);
+          console.warn('Supabase health check:', { cfg, health });
+          toast.info(`No network/blocked request. Saved offline and will auto-sync. Host ${cfg.host}; health ${health.ok ? 'ok' : health.error || health.status}`);
           onOpenChange(false);
         } else {
           toast.error(`Failed to save reading: ${error.message}`);
@@ -149,7 +166,27 @@ export const AddReadingDialog = ({ isOpen, onOpenChange, waterSources, onReading
       setNotes('');
     } catch (error) {
       console.error('Error saving water reading:', error);
-      toast.error('Failed to save reading');
+      const msg = String((error as Error)?.message || error || '');
+  if (isLikelyNetworkError(msg)) {
+        // Queue on network error as well
+        const selectedWaterSource = waterSources.find(source => source.id.toString() === selectedSourceId);
+        const readingValue = parseFloat(reading);
+        addPendingReading({
+          component_type: selectedWaterSource?.name ?? 'Unknown',
+          component_name: selectedWaterSource?.name ?? 'Unknown',
+          water_source_id: selectedWaterSource?.isFallback ? undefined : parseInt(selectedSourceId),
+          reading: isNaN(readingValue) ? 0 : readingValue,
+          date: selectedDate.toISOString(),
+          comment: notes.trim() || null,
+        });
+        const cfg = getSupabaseConfigSummary();
+        const health = await pingSupabaseAuthHealth(3000);
+        console.warn('Supabase health check:', { cfg, health });
+        toast.info(`No network/blocked request. Saved offline and will auto-sync. Host ${cfg.host}; health ${health.ok ? 'ok' : health.error || health.status}`);
+        onOpenChange(false);
+      } else {
+        toast.error('Failed to save reading');
+      }
     } finally {
       setIsSubmitting(false);
     }

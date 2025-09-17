@@ -27,6 +27,13 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
   },
 });
 
+try {
+  const host = new URL(SUPABASE_URL).host;
+  console.log(`[Supabase] Client initialized for host: ${host}`);
+} catch {
+  // no-op
+}
+
 // Add custom type for reports until Supabase types are updated
 export type ReportType = {
   id: string;

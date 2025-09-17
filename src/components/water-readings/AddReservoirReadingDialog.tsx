@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { ReservoirReading } from '@/hooks/useWaterReadings';
 import { addPendingReservoirReading, trySyncPendingReservoirReadings } from '@/utils/storage/pendingReservoirReadings';
+import { getSupabaseConfigSummary, pingSupabaseAuthHealth, isLikelyNetworkError } from '@/integrations/supabase/diagnostics';
 
 interface AddReservoirReadingDialogProps {
   isOpen: boolean;
@@ -118,9 +119,18 @@ export const AddReservoirReadingDialog = ({
 
       if (error) {
         console.error('Error saving reservoir reading:', error);
-        if (String(error.message || '').toLowerCase().includes('row-level security')) {
+        const lower = String(error.message || '').toLowerCase();
+        if (lower.includes('row-level security')) {
           addPendingReservoirReading(readingData);
           toast.info('No permission to write yet. Reading saved offline and will sync automatically once permissions are applied.');
+          onOpenChange(false);
+  } else if (isLikelyNetworkError(error.message)) {
+          // Treat network failures as offline; queue and inform
+          addPendingReservoirReading(readingData);
+          const cfg = getSupabaseConfigSummary();
+          const health = await pingSupabaseAuthHealth(3000);
+          console.warn('Supabase health check:', { cfg, health });
+          toast.info(`Network issue detected; saved offline and will auto-sync. Host ${cfg.host}${cfg.isHttps ? '' : ' (non-HTTPS)'}; health ${health.ok ? 'ok' : health.error || health.status}`);
           onOpenChange(false);
         } else {
           toast.error(`Failed to save reading: ${error.message}`);
@@ -133,7 +143,24 @@ export const AddReservoirReadingDialog = ({
       onOpenChange(false);
     } catch (error) {
       console.error('Error saving reservoir reading:', error);
-      toast.error('Failed to save reading');
+  const msg = String((error as Error)?.message || error || '');
+  if (isLikelyNetworkError(msg)) {
+        // Queue on unexpected network exception too
+        const readingData = {
+          water_level: parseFloat(waterLevel),
+          percentage_full: parseFloat(percentageFull),
+          reading_date: selectedDate.toISOString(),
+          notes: notes.trim() || null,
+        };
+        addPendingReservoirReading(readingData);
+        const cfg = getSupabaseConfigSummary();
+        const health = await pingSupabaseAuthHealth(3000);
+        console.warn('Supabase health check:', { cfg, health });
+        toast.info(`Network issue detected; saved offline and will auto-sync. Host ${cfg.host}${cfg.isHttps ? '' : ' (non-HTTPS)'}; health ${health.ok ? 'ok' : health.error || health.status}`);
+        onOpenChange(false);
+      } else {
+        toast.error('Failed to save reading');
+      }
     } finally {
       setIsSubmitting(false);
     }
