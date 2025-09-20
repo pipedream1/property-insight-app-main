@@ -10,6 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { format } from 'date-fns';
 import Webcam from 'react-webcam';
 import { supabase } from '@/integrations/supabase/client';
+import { uploadImageToStorage } from '@/utils/storage/uploadService';
 import { toast } from 'sonner';
 import { useInspections } from '@/hooks/useInspections';
 
@@ -46,22 +47,22 @@ export const InspectionForm: React.FC<InspectionFormProps> = ({
 
   const uploadPhoto = async (file: Blob) => {
     try {
-      const fileName = `inspection-${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
-      const { data, error } = await supabase.storage
-        .from('inspection-photos')
-        .upload(fileName, file);
-
-      if (error) throw error;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('inspection-photos')
-        .getPublicUrl(fileName);
-
+      const publicUrl = await uploadImageToStorage(file, {
+        bucketName: 'inspection-photos',
+        folderPath: 'raw'
+      });
       setPhotos(prev => [...prev, publicUrl]);
-      toast.success('Photo uploaded successfully');
+      toast.success('Photo uploaded');
     } catch (error) {
-      console.error('Error uploading photo:', error);
-      toast.error('Failed to upload photo');
+      console.error('InspectionForm photo upload error:', error);
+      const msg = error instanceof Error ? error.message : String(error);
+      if (msg.toLowerCase().includes('permission')) {
+        toast.error('No permission to upload (check bucket policies)');
+      } else if (msg.toLowerCase().includes('failed to fetch')) {
+        toast.error('Network error uploading photo');
+      } else {
+        toast.error('Failed to upload photo');
+      }
     }
   };
 

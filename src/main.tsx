@@ -2,6 +2,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
+import { runSupabaseDiagnostics } from './diagnostics/supabaseDiagnostics';
 import { AuthProvider } from './contexts/AuthContext'
 import ErrorBoundary from './components/ErrorBoundary'
 import './index.css'
@@ -12,6 +13,8 @@ if (!container) {
 }
 
 const root = createRoot(container);
+
+runSupabaseDiagnostics();
 
 root.render(
   <StrictMode>

@@ -10,8 +10,8 @@ export const ensureRequiredBuckets = async (): Promise<void> => {
   try {
     console.log("Ensuring all required storage buckets exist...");
     
-    // List of buckets we need
-    const requiredBuckets = ['images'];
+  // List of buckets we need (created via SQL migration, not client-side)
+  const requiredBuckets = ['inspection-photos'];
     
     // Get existing buckets
     const { data: buckets, error } = await supabase.storage.listBuckets();
@@ -25,44 +25,12 @@ export const ensureRequiredBuckets = async (): Promise<void> => {
     const existingBucketNames = buckets?.map(bucket => bucket.name) || [];
     console.log("Existing buckets:", existingBucketNames);
     
-    // Create any missing buckets
+    // Do NOT attempt to create buckets from the client for security reasons.
+    // Simply warn if the expected bucket isn't present.
     for (const bucketName of requiredBuckets) {
       if (!existingBucketNames.includes(bucketName)) {
-        console.log(`Creating missing bucket: ${bucketName}`);
-        
-        try {
-          // Check if the bucket already exists (double-check)
-          const { data: checkData } = await supabase.storage.getBucket(bucketName);
-          
-          if (checkData) {
-            console.log(`Bucket ${bucketName} already exists`);
-            continue;
-          }
-          
-          // Try to create the bucket with public access
-          const { error: createError } = await supabase.storage.createBucket(
-            bucketName, 
-            { 
-              public: true,
-              fileSizeLimit: 10485760 // 10MB
-            }
-          );
-          
-          if (createError) {
-            // If we can't create the bucket, log the specific error
-            console.error(`Error creating bucket ${bucketName}:`, createError);
-            console.log("Error message:", createError.message);
-            console.log("Error name:", createError.name);
-            
-            // Try to use the bucket anyway - with our updated policies this should work
-            console.log(`Attempting to use existing bucket: ${bucketName}`);
-          } else {
-            console.log(`Successfully created bucket: ${bucketName}`);
-          }
-        } catch (bucketError) {
-          console.error(`Error processing bucket ${bucketName}:`, bucketError);
-          toast.warning(`Storage bucket '${bucketName}' may not be configured correctly.`);
-        }
+        console.warn(`Required bucket '${bucketName}' not found. Ensure the migration created it and policies allow access.`);
+        toast.warning(`Storage bucket '${bucketName}' is missing. Please run the SQL migration in Supabase.`);
       } else {
         console.log(`Bucket '${bucketName}' exists, proceeding with upload`);
       }

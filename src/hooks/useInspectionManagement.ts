@@ -57,7 +57,14 @@ export const useInspectionManagement = (
         
       if (result.error) {
         console.error('Error saving inspection:', result.error);
-        toast.error('Failed to save inspection record');
+        const msg = typeof result.error.message === 'string' ? result.error.message.toLowerCase() : '';
+        if (msg.includes('permission')) {
+          toast.error('Permission denied saving inspection (check RLS)');
+        } else if (msg.includes('failed to fetch')) {
+          toast.error('Network error saving inspection');
+        } else {
+          toast.error('Failed to save inspection record');
+        }
         return;
       }
       
@@ -85,7 +92,12 @@ export const useInspectionManagement = (
       onInspectionSaved();
     } catch (error) {
       console.error('Error saving inspection:', error);
-      toast.error('Failed to save inspection record');
+      const msg = error instanceof Error ? error.message.toLowerCase() : '';
+      if (msg.includes('failed to fetch')) {
+        toast.error('Network error saving inspection');
+      } else {
+        toast.error('Failed to save inspection record');
+      }
     }
   };
   

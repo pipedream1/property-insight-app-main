@@ -23,18 +23,19 @@ export const uploadImageToStorage = async (
     
     const { 
       onProgress = () => {},
-      bucketName = 'images',
+  // Use the provisioned bucket from our SQL migration
+  bucketName = 'inspection-photos',
       folderPath = 'uploads'
     } = options;
     
     // Ensure the bucket exists before uploading
-    console.log(`Checking bucket ${bucketName} before upload...`);
+  console.log(`Checking bucket ${bucketName} before upload...`);
     
     // Try to ensure buckets first - this will create if missing
     try {
-      console.log("Attempting to ensure buckets exist...");
-      await ensureRequiredBuckets();
-      console.log("Buckets initialization completed");
+  console.log("Attempting to verify required buckets...");
+  await ensureRequiredBuckets();
+  console.log("Bucket verification completed");
     } catch (bucketSetupError) {
       console.error("Error ensuring buckets:", bucketSetupError);
       // Continue anyway - the bucket might already exist
@@ -80,7 +81,7 @@ export const uploadImageToStorage = async (
     console.log(`Uploading file to ${bucketName}/${filePath}...`);
     
     // Convert file to smaller size if it's too large
-    let uploadFile = file;
+  const uploadFile = file;
     if (file.size > 5 * 1024 * 1024) {
       try {
         console.log("File is large, attempting to compress before upload");
