@@ -87,3 +87,5 @@ export const Inspections: React.FC = () => {
     </div>
   );
 };
+
+export default Inspections;
