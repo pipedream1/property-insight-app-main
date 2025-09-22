@@ -6,7 +6,7 @@ import PropertyComponents from "./pages/PropertyComponents";
 import Maintenance from "./pages/Maintenance";
 import Reports from "./pages/Reports";
 import WaterReadings from "./pages/WaterReadings";
-import Inspections from "./pages/Inspections";
+import { Inspections } from "./pages/Inspections";
 import WhatsAppIntegration from "./pages/WhatsAppIntegration";
 import PremiumReports from "./pages/PremiumReports";
 import Community from "./pages/Community";
