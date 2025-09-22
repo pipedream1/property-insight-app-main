@@ -1,26 +1,32 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import { offlineStorage } from '@/utils/storage/offlineStorage';
 import { uploadImageToStorage } from '@/utils/storage/uploadService';
 
-export const useOfflineSync = () => {
+export const useOfflineSync = (options: { auto?: boolean } = {}) => {
+  const { auto = true } = options;
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [syncInProgress, setSyncInProgress] = useState(false);
   const [pendingUploads, setPendingUploads] = useState(0);
-
-  const updateOnlineStatus = useCallback(() => {
-    const online = navigator.onLine;
-    setIsOnline(online);
-    
-    if (online && !syncInProgress) {
-      syncOfflinePhotos();
+  const [paused, setPaused] = useState<boolean>(() => {
+    try {
+      const stored = localStorage.getItem('offlineSyncPaused');
+      return stored === 'true';
+    } catch (e) {
+      // ignore read error (private mode etc.)
+      return false;
     }
-  }, [syncInProgress]);
+  });
+  const syncInProgressRef = useRef(false); // prevents re-entrant looping due to dependency changes
 
   const syncOfflinePhotos = useCallback(async () => {
-    if (syncInProgress) return;
-    
+    if (paused) {
+      console.log('Offline photo sync is paused; skipping.');
+      return;
+    }
+    if (syncInProgressRef.current) return; // guard
+    syncInProgressRef.current = true;
     setSyncInProgress(true);
     console.log('Starting offline photo sync...');
     
@@ -42,7 +48,7 @@ export const useOfflineSync = () => {
           console.log(`Uploading photo ${photo.id}...`);
           
           const publicUrl = await uploadImageToStorage(photo.blob, {
-            bucketName: 'images',
+            bucketName: 'inspection-photos',
             folderPath: 'offline-sync',
             onProgress: (progress) => {
               console.log(`Upload progress for ${photo.id}: ${progress}%`);
@@ -88,9 +94,19 @@ export const useOfflineSync = () => {
       console.error('Error during offline sync:', error);
       toast.error('Failed to sync offline photos');
     } finally {
+      syncInProgressRef.current = false;
       setSyncInProgress(false);
     }
-  }, [syncInProgress]);
+  }, [paused]);
+
+  const updateOnlineStatus = useCallback(() => {
+    const online = navigator.onLine;
+    setIsOnline(online);
+    if (!auto || paused) return;
+    if (online && !syncInProgressRef.current) {
+      void syncOfflinePhotos();
+    }
+  }, [auto, paused, syncOfflinePhotos]);
 
   const storePhotoOffline = useCallback(async (
     blob: Blob, 
@@ -128,33 +144,47 @@ export const useOfflineSync = () => {
   }, []);
 
   useEffect(() => {
-    // Initialize offline storage
+    // Initialize offline storage once
     offlineStorage.init().then(() => {
       console.log('Offline storage initialized');
       getPendingPhotosCount().then(setPendingUploads);
+      if (auto && !paused && navigator.onLine) {
+        void syncOfflinePhotos();
+      }
     });
 
-    // Set up online/offline event listeners
     window.addEventListener('online', updateOnlineStatus);
     window.addEventListener('offline', updateOnlineStatus);
-
-    // Check for pending uploads on mount
-    if (navigator.onLine) {
-      syncOfflinePhotos();
-    }
-
     return () => {
       window.removeEventListener('online', updateOnlineStatus);
       window.removeEventListener('offline', updateOnlineStatus);
     };
-  }, [updateOnlineStatus, syncOfflinePhotos, getPendingPhotosCount]);
+  }, [auto, paused, updateOnlineStatus, getPendingPhotosCount, syncOfflinePhotos]);
+
+  const pauseSync = () => {
+    setPaused(true);
+    try { localStorage.setItem('offlineSyncPaused', 'true'); } catch (e) { /* ignore */ }
+  };
+  const resumeSync = async () => {
+    setPaused(false);
+    try { localStorage.setItem('offlineSyncPaused', 'false'); } catch (e) { /* ignore */ }
+    const photos = await offlineStorage.getAllPhotos();
+    const count = photos.length;
+    toast.info(`Resuming sync. ${count} photo${count===1?'':'s'} queued.`);
+    if (isOnline && count > 0) {
+      void syncOfflinePhotos();
+    }
+  };
 
   return {
     isOnline,
     syncInProgress,
+    paused,
     pendingUploads,
     storePhotoOffline,
     syncOfflinePhotos,
-    getPendingPhotosCount
+    getPendingPhotosCount,
+    pauseSync,
+    resumeSync
   };
 };
